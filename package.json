@@ -1,0 +1,41 @@
+{
+  "name": "click-ship-done",
+  "version": "0.1.0",
+  "description": "Click. Ship. Done. — AI Agents on Cloudflare. Talk demo: a chat agent + MCP server that inspects GitHub repos.",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev:mcp": "wrangler dev -c wrangler.mcp.jsonc --port 8788",
+    "dev:agent": "vite dev",
+    "build:agent": "vite build",
+    "deploy:mcp": "wrangler deploy -c wrangler.mcp.jsonc",
+    "deploy:agent": "vite build && wrangler deploy -c wrangler.agent.jsonc",
+    "deploy": "pnpm deploy:mcp && pnpm deploy:agent",
+    "tsc": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@ai-sdk/react": "^3.0.184",
+    "@cloudflare/ai-chat": "^0.7.0",
+    "@cloudflare/workers-oauth-provider": "^0.6.0",
+    "@modelcontextprotocol/sdk": "1.29.0",
+    "@phosphor-icons/react": "^2.1.10",
+    "agents": "^0.12.4",
+    "ai": "^6.0.182",
+    "hono": "^4.12.18",
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6",
+    "streamdown": "^2.5.0",
+    "workers-ai-provider": "^3.1.14",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@cloudflare/vite-plugin": "^1.37.0",
+    "@cloudflare/workers-types": "^4.20260511.1",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.1",
+    "typescript": "^6.0.3",
+    "vite": "^8.0.12",
+    "wrangler": "^4.91.0"
+  }
+}
