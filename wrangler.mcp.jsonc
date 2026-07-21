@@ -10,5 +10,6 @@
   // GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET are set with:
   //   wrangler secret put GITHUB_CLIENT_ID -c wrangler.mcp.jsonc
   //   wrangler secret put GITHUB_CLIENT_SECRET -c wrangler.mcp.jsonc
-  "observability": { "enabled": true }
+  "observability": { "enabled": true, "traces": { "enabled": true } },
+  "upload_source_maps": true
 }

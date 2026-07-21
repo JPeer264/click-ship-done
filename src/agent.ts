@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/cloudflare";
 import { AIChatAgent, type OnChatMessageOptions } from "@cloudflare/ai-chat";
 import { callable, routeAgentRequest } from "agents";
 import { createWorkersAI } from "workers-ai-provider";
@@ -14,11 +15,14 @@ import {
 // call, so it leaks as raw text. Strip the section so the model doesn't see and replay it.
 function stripKimiTemplate(text: string): string {
   return text
-    .replace(/<\|tool_calls_section_begin\|>[\s\S]*?<\|tool_calls_section_end\|>/g, "")
+    .replace(
+      /<\|tool_calls_section_begin\|>[\s\S]*?<\|tool_calls_section_end\|>/g,
+      "",
+    )
     .trim();
 }
 
-export class ChatAgent extends AIChatAgent<Env> {
+class ChatAgentBase extends AIChatAgent<Env> {
   maxPersistedMessages = 50;
 
   onStart() {
@@ -153,11 +157,29 @@ export class ChatAgent extends AIChatAgent<Env> {
   }
 }
 
-export default {
-  async fetch(req: Request, env: Env): Promise<Response> {
-    return (
-      (await routeAgentRequest(req, env, { cors: true })) ??
-      new Response("Not found", { status: 404 })
-    );
-  },
-} satisfies ExportedHandler<Env>;
+export const ChatAgent = Sentry.instrumentDurableObjectWithSentry(
+  (env: Env) => ({
+    dsn: "https://0299849066e3bcf4626b214897b6c17f@o447951.ingest.us.sentry.io/4510555608449024",
+    tracesSampleRate: 1.0,
+    enableRpcTracePropagation: true,
+    dataCollection: {},
+  }),
+  ChatAgentBase,
+);
+
+export default Sentry.withSentry(
+  (env: Env) => ({
+    dsn: "https://0299849066e3bcf4626b214897b6c17f@o447951.ingest.us.sentry.io/4510555608449024",
+    tracesSampleRate: 1.0,
+    enableRpcTracePropagation: true,
+    dataCollection: {},
+  }),
+  {
+    async fetch(req: Request, env: Env): Promise<Response> {
+      return (
+        (await routeAgentRequest(req, env, { cors: true })) ??
+        new Response("Not found", { status: 404 })
+      );
+    },
+  } satisfies ExportedHandler<Env>,
+);

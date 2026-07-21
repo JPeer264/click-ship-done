@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/cloudflare";
 import { OAuthProvider } from "@cloudflare/workers-oauth-provider";
 import { createMcpHandler, getMcpAuthContext } from "agents/mcp";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -218,7 +219,7 @@ const apiHandler = {
   },
 };
 
-export default new OAuthProvider({
+const oauthProvider = new OAuthProvider({
   authorizeEndpoint: "/authorize",
   tokenEndpoint: "/oauth/token",
   clientRegistrationEndpoint: "/oauth/register",
@@ -230,3 +231,15 @@ export default new OAuthProvider({
     },
   },
 });
+
+export default Sentry.withSentry(
+  () => ({
+    dsn: "https://01a7121b31987d889dc412a9a91ed23d@o447951.ingest.us.sentry.io/4511387458142208",
+    tracesSampleRate: 1.0,
+  }),
+  {
+    async fetch(req: Request, env: unknown, ctx: ExecutionContext) {
+      return oauthProvider.fetch(req, env, ctx);
+    },
+  } satisfies ExportedHandler,
+);
