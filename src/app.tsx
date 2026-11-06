@@ -3,16 +3,12 @@ import { useAgent } from "agents/react";
 import { useAgentChat } from "@cloudflare/ai-chat/react";
 import type { MCPServersState } from "agents";
 import type { ChatAgent } from "./agent";
-import { ChatInput, ChatMessage, Header, LoginScreen } from "./components";
+import { ChatInput, ChatMessage, Header } from "./components";
 import { useMcpServer, useScrollToBottom, useTheme } from "./hooks";
 
-type ConnectResult =
-  | { state: "ready" }
-  | { state: "authenticating"; authUrl: string };
+type ConnectResult = { state: "ready" } | { state: "authenticating"; authUrl: string };
 
-function openOAuthPopup(authUrl: string, name: string): Window | null {
-  return window.open(authUrl, name, "width=620,height=760,popup=yes");
-}
+const SUGGESTIONS = ["What is the weather in Krakow?", "Do I need an umbrella in Vienna this week?"];
 
 function getSessionId(): string {
   let id = localStorage.getItem("session-id");
@@ -28,7 +24,8 @@ export function App() {
   const [sessionId] = useState(getSessionId);
   const { theme, toggle: toggleTheme } = useTheme();
 
-  const agent = useAgent<ChatAgent>({
+  // One agent instance (one Durable Object) for each browser.
+  const agent = useAgent<InstanceType<typeof ChatAgent>>({
     agent: "ChatAgent",
     name: sessionId,
     onMcpUpdate: (s) => setMcpServers(s.servers),
@@ -36,38 +33,29 @@ export function App() {
 
   const { messages, sendMessage, status, stop, clearHistory } = useAgentChat({ agent });
 
-  const github = useMcpServer(mcpServers, "github-inspector");
+  const weather = useMcpServer(mcpServers, "weather");
   const sentry = useMcpServer(mcpServers, "sentry");
   const scrollRef = useScrollToBottom(messages);
   const busy = status === "submitted" || status === "streaming";
 
-  const connectMcp = async (method: "connectGithub" | "connectSentry", popupName: string) => {
+  const connectSentry = async () => {
     try {
-      const res = (await agent.call(method)) as ConnectResult;
+      const res = (await agent.call("connectSentry")) as ConnectResult;
       if (res?.state === "authenticating" && res.authUrl) {
-        openOAuthPopup(res.authUrl, popupName);
+        window.open(res.authUrl, "mcp-oauth-sentry", "width=620,height=760,popup=yes");
       }
     } catch (err) {
-      console.error(`${method} failed:`, err);
+      console.error("connectSentry failed:", err);
     }
   };
 
-  const disconnectMcp = async (method: "disconnectGithub" | "disconnectSentry") => {
+  const disconnectSentry = async () => {
     try {
-      await agent.call(method);
+      await agent.call("disconnectSentry");
     } catch (err) {
-      console.error(`${method} failed:`, err);
+      console.error("disconnectSentry failed:", err);
     }
   };
-
-  if (!github.ready) {
-    return (
-      <LoginScreen
-        connecting={github.connecting}
-        onConnect={() => connectMcp("connectGithub", "mcp-oauth-github")}
-      />
-    );
-  }
 
   return (
     <div className="app">
@@ -76,25 +64,24 @@ export function App() {
         onToggleTheme={toggleTheme}
         hasMessages={messages.length > 0}
         onClearChat={clearHistory}
+        weatherConnected={weather.ready}
         sentryConnected={sentry.ready}
         sentryConnecting={sentry.connecting}
-        onConnectSentry={() => connectMcp("connectSentry", "mcp-oauth-sentry")}
-        onDisconnectSentry={() => disconnectMcp("disconnectSentry")}
-        onDisconnectGithub={() => disconnectMcp("disconnectGithub")}
+        onConnectSentry={connectSentry}
+        onDisconnectSentry={disconnectSentry}
       />
       <main ref={scrollRef}>
         <div className="chat-container">
           {messages.length === 0 ? (
             <div className="empty-state">
               <h2>What would you like to know?</h2>
-              <p>Ask about any GitHub repository, PRs, or issues</p>
+              <p>Ask about the weather anywhere in the world</p>
               <div className="suggestions">
-                <button onClick={() => sendMessage({ text: "Summarize cloudflare/agents" })}>
-                  Summarize cloudflare/agents
-                </button>
-                <button onClick={() => sendMessage({ text: "Show recent PRs in vercel/next.js" })}>
-                  Recent PRs in vercel/next.js
-                </button>
+                {SUGGESTIONS.map((text) => (
+                  <button key={text} onClick={() => sendMessage({ text })}>
+                    {text}
+                  </button>
+                ))}
               </div>
             </div>
           ) : (
@@ -102,11 +89,7 @@ export function App() {
           )}
         </div>
       </main>
-      <ChatInput
-        busy={busy}
-        onSend={(text) => sendMessage({ text })}
-        onStop={stop}
-      />
+      <ChatInput busy={busy} onSend={(text) => sendMessage({ text })} onStop={stop} />
     </div>
   );
 }

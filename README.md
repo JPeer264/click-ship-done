@@ -1,97 +1,45 @@
-# Click. Ship. Done. — AI Agents on Cloudflare
+# Click. Ship. Done. AI Agents on Cloudflare
 
-Demo project from the talk **"Click. Ship. Done. AI Agents on Cloudflare"**.
+Demo project of the talk **"Click. Ship. Done. AI Agents on Cloudflare"**.
 
-A chat agent that inspects any GitHub repo by calling MCP tools that hit the
-GitHub REST API. The MCP server is OAuth-protected — visitors sign in with
-their own GitHub account, so each user uses their own rate limit and can
-inspect their own private repos. Two Workers, one repo, one `pnpm deploy`.
+A chat agent that answers questions about the weather. It gets live data from a weather MCP server with two tools, `getWeather` and `getForecast` ([Open-Meteo](https://open-meteo.com), no API key). The agent, the MCP server and the React app are one Worker.
 
-## One-time setup
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/JPeer264/click-ship-done)
 
-### 1. Install
+The button copies this repository to your GitHub account, creates the Durable Object and the Workers AI binding, and runs `vite build && wrangler deploy`. You do not need an API key: the model `@cf/zai-org/glm-4.7-flash` runs on the Workers AI free plan.
+
+## Sentry (optional)
+
+Set `SENTRY_DSN` to the DSN of your Sentry project, in the deploy form or later in the dashboard (**Settings** > **Variables and Secrets**). One value turns on Sentry for the Worker and for the browser. Without it, the app runs without Sentry.
+
+## Local development
 
 ```bash
 $ pnpm install
+$ pnpm dev
 ```
 
-### 2. Create a GitHub OAuth App
+Open http://localhost:5173 and ask:
 
-Go to https://github.com/settings/developers → **OAuth Apps** → **New OAuth App**.
+> Do I need an umbrella in Vienna this week?
 
-| Field                       | Local dev                            | Production                                                |
-|-----------------------------|--------------------------------------|-----------------------------------------------------------|
-| Application name            | `click-ship-done (local)`            | `click-ship-done`                                         |
-| Homepage URL                | `http://localhost:8788`              | `https://click-ship-done-mcp.<your-sub>.workers.dev`      |
-| Authorization callback URL  | `http://localhost:8788/callback`     | `https://click-ship-done-mcp.<your-sub>.workers.dev/callback` |
+Workers AI always runs remotely, so `pnpm dev` asks you to log in to Cloudflare once.
 
-Generate a client secret and keep both `Client ID` and `Client Secret` handy.
-You'll likely want one OAuth App per environment.
-
-### 3. Create the KV namespace (for OAuth state)
+## Deploy from your machine
 
 ```bash
-$ pnpm wrangler kv namespace create OAUTH_KV
+$ pnpm run deploy
 ```
-
-Paste the printed `id` into the `kv_namespaces` array in
-`wrangler.mcp.jsonc` (replace `REPLACE_WITH_KV_NAMESPACE_ID`).
-
-### 4. Set the GitHub OAuth secrets
-
-For deploy:
-```bash
-$ pnpm wrangler secret put GITHUB_CLIENT_ID -c wrangler.mcp.jsonc
-$ pnpm wrangler secret put GITHUB_CLIENT_SECRET -c wrangler.mcp.jsonc
-```
-
-For local dev, create `.dev.vars` (gitignored) in the repo root:
-
-```ini
-GITHUB_CLIENT_ID=Iv1.xxxxxxxxxxxxxxxx
-GITHUB_CLIENT_SECRET=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-MCP_SERVER_URL=http://localhost:8788/mcp
-```
-
-## Local dev
-
-In two terminals:
-
-```bash
-$ pnpm dev:mcp     # http://localhost:8788   (MCP at /mcp, OAuth at /authorize)
-$ pnpm dev:agent   # http://localhost:5173   (React chat + agent worker)
-```
-
-Open `http://localhost:5173` → a popup opens to GitHub for OAuth → after
-approval, ask:
-
-> summarize cloudflare/agents and tell me if it's healthy
-
-## Deploy
-
-```bash
-$ pnpm deploy:mcp
-# → prints e.g. https://click-ship-done-mcp.<your-sub>.workers.dev
-
-# Set MCP_SERVER_URL for the agent (once per account):
-$ echo "https://click-ship-done-mcp.<your-sub>.workers.dev/mcp" | pnpm wrangler secret put MCP_SERVER_URL -c wrangler.agent.jsonc
-
-$ pnpm deploy:agent
-```
-
-After initial setup, `pnpm deploy` runs both.
 
 ## Files
 
-| Path                       | What                                                              |
-|----------------------------|-------------------------------------------------------------------|
-| `wrangler.mcp.jsonc`       | MCP-server Worker config (KV for OAuth state, no DO).             |
-| `wrangler.agent.jsonc`     | Agent Worker config (Workers AI, ChatAgent DO, assets).           |
-| `src/mcp.ts`               | MCP server: 3 tools (`whoami`, `getRepoInfo`, `getRecentPRs`).    |
-| `src/auth-handler.ts`      | Hono routes for `/authorize` and `/callback` (GitHub OAuth).      |
-| `src/agent.ts`             | `ChatAgent` extends `AIChatAgent`; auto-adds MCP, popup handler.  |
-| `src/app.tsx`              | React chat UI (Streamdown, Phosphor icons, collapsible tools).    |
-| `index.html`               | Vite entry.                                                       |
+| Path                       | What                                                                     |
+| -------------------------- | ------------------------------------------------------------------------ |
+| `wrangler.jsonc`           | Worker config: Workers AI, the `ChatAgent` Durable Object, static assets |
+| `src/agent.ts`             | `ChatAgent` (extends `AIChatAgent`) and the Worker `fetch` handler       |
+| `src/mcp.ts`               | The weather MCP server at `/mcp`                                         |
+| `src/instrument.server.ts` | Sentry options of the Worker                                             |
+| `src/app.tsx`              | React chat UI                                                            |
 
 ## License
 

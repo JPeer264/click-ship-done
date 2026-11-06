@@ -7,11 +7,11 @@ interface HeaderProps {
   onToggleTheme: () => void;
   hasMessages: boolean;
   onClearChat: () => void;
+  weatherConnected: boolean;
   sentryConnected: boolean;
   sentryConnecting: boolean;
   onConnectSentry: () => void;
   onDisconnectSentry: () => void;
-  onDisconnectGithub: () => void;
 }
 
 export function Header({
@@ -19,16 +19,16 @@ export function Header({
   onToggleTheme,
   hasMessages,
   onClearChat,
+  weatherConnected,
   sentryConnected,
   sentryConnecting,
   onConnectSentry,
   onDisconnectSentry,
-  onDisconnectGithub,
 }: HeaderProps) {
   return (
     <header>
       <div className="header-brand">
-        <h1>GitHub Repo Agent</h1>
+        <h1>Weather Agent</h1>
       </div>
       <div className="header-actions">
         <IconButton
@@ -42,13 +42,7 @@ export function Header({
             <TrashIcon size={18} />
           </IconButton>
         )}
-        <ConnectionPill
-          name="GitHub"
-          connected={true}
-          connecting={false}
-          onConnect={() => {}}
-          onDisconnect={onDisconnectGithub}
-        />
+        <ConnectionPill name="Weather" connected={weatherConnected} connecting={!weatherConnected} />
         <ConnectionPill
           name="Sentry"
           connected={sentryConnected}

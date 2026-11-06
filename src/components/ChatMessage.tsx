@@ -3,15 +3,9 @@ import { getToolName, isToolUIPart, type UIMessage } from "ai";
 import { Streamdown } from "streamdown";
 import { CaretDownIcon, GearIcon } from "@phosphor-icons/react";
 
+// getAITools() names MCP tools `tool_<server id>_<tool name>`.
 function shortToolName(name: string): string {
-  const m = name.match(/^[A-Za-z0-9_-]{6,}_([A-Za-z][A-Za-z0-9]*)$/);
-  return m ? m[1] : name;
-}
-
-function stripKimiTemplate(text: string): string {
-  return text
-    .replace(/<\|tool_calls_section_begin\|>[\s\S]*?<\|tool_calls_section_end\|>/g, "")
-    .trim();
+  return name.replace(/^tool_[A-Za-z0-9]+_/, "");
 }
 
 function unwrapMcpOutput(output: unknown): string {
@@ -72,7 +66,7 @@ function ToolPart({ part }: { part: UIMessage["parts"][number] }) {
 export function ChatMessage({ msg }: { msg: UIMessage }) {
   const rendered = msg.parts.flatMap((part, i) => {
     if (part.type === "text") {
-      const text = msg.role === "assistant" ? stripKimiTemplate(part.text) : part.text;
+      const text = part.text.trim();
       if (!text) return [];
       return [
         msg.role === "assistant" ? (

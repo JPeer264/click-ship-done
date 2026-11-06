@@ -1,10 +1,17 @@
 import * as Sentry from "@sentry/react";
 
-Sentry.init({
-  dsn: "https://01a7121b31987d889dc412a9a91ed23d@o447951.ingest.us.sentry.io/4511387458142208",
-  integrations: [
-    Sentry.browserTracingIntegration(),
-  ],
-  tracesSampleRate: 1.0,
-  tracePropagationTargets: ["localhost", /^\//, /^https:\/\/click-ship-done/],
-});
+// The DSN comes from the SENTRY_DSN variable of the Worker. Without it, the app runs without Sentry.
+export async function initSentry() {
+  try {
+    const res = await fetch("/config.json");
+    const { sentryDsn } = (await res.json()) as { sentryDsn: string | null };
+    if (!sentryDsn) return;
+    Sentry.init({
+      dsn: sentryDsn,
+      integrations: [Sentry.browserTracingIntegration()],
+      tracesSampleRate: 1.0,
+    });
+  } catch (err) {
+    console.warn("Sentry is off, /config.json failed", err);
+  }
+}

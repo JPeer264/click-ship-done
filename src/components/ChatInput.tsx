@@ -25,7 +25,7 @@ export function ChatInput({ busy, onSend, onStop }: ChatInputProps) {
           type="text"
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder="Ask about any GitHub repo..."
+          placeholder="Ask about the weather..."
           autoComplete="off"
         />
         {busy ? (

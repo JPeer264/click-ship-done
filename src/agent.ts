@@ -1,32 +1,24 @@
-import * as Sentry from "@sentry/cloudflare";
 import { AIChatAgent, type OnChatMessageOptions } from "@cloudflare/ai-chat";
-import { callable, routeAgentRequest } from "agents";
+import { callable, routeAgentRequest, type Connection, type ConnectionContext } from "agents";
 import { createWorkersAI } from "workers-ai-provider";
 import {
   convertToModelMessages,
+  createUIMessageStreamResponse,
   getToolName,
   isToolUIPart,
   stepCountIs,
   streamText,
 } from "ai";
+import { mcpHandler } from "./mcp";
 
-// Kimi sometimes emits its native tool-call template (`<|tool_calls_section_begin|>...`)
-// when the bound tool is missing. The provider can't parse it back into a structured
-// call, so it leaks as raw text. Strip the section so the model doesn't see and replay it.
-function stripKimiTemplate(text: string): string {
-  return text
-    .replace(
-      /<\|tool_calls_section_begin\|>[\s\S]*?<\|tool_calls_section_end\|>/g,
-      "",
-    )
-    .trim();
-}
+// Free on the Workers AI free plan, and it can call tools.
+const MODEL = "@cf/zai-org/glm-4.7-flash";
 
-class ChatAgentBase extends AIChatAgent<Env> {
+export class ChatAgent extends AIChatAgent<Env> {
   maxPersistedMessages = 50;
 
   onStart() {
-    // Self-close the popup window after GitHub OAuth completes.
+    // Closes the OAuth popup of the Sentry MCP server when the sign-in is done.
     this.mcp.configureOAuthCallback({
       customHandler: (result) => {
         if (result.authSuccess) {
@@ -40,146 +32,92 @@ class ChatAgentBase extends AIChatAgent<Env> {
             { headers: { "content-type": "text/html" }, status: 200 },
           );
         }
-        return new Response(
-          `Authentication failed: ${result.authError ?? "Unknown error"}`,
-          { headers: { "content-type": "text/plain" }, status: 400 },
-        );
+        return new Response(`Authentication failed: ${result.authError ?? "Unknown error"}`, {
+          headers: { "content-type": "text/plain" },
+          status: 400,
+        });
       },
     });
   }
 
-  // The client invokes this on first mount. Returns either
-  //   { state: "authenticating", authUrl } → client opens a popup, or
-  //   { state: "ready" } → already signed in, nothing to do.
-  @callable()
-  async connectGithub() {
-    return await this.addMcpServer("github-inspector", this.env.MCP_SERVER_URL);
-  }
-
-  @callable()
-  async disconnectGithub() {
-    return await this.disconnectMcpByName("github-inspector");
+  async onConnect(_connection: Connection, ctx: ConnectionContext) {
+    // The weather MCP server is part of this Worker. The URL comes from the request, so it works on
+    // localhost, on workers.dev and on a custom domain. Calls with the same name and URL do nothing.
+    // The fixed id gives readable tool names, such as tool_weather_getWeather.
+    const { origin } = new URL(ctx.request.url);
+    try {
+      await this.addMcpServer("weather", `${origin}/mcp`, { id: "weather" });
+    } catch (err) {
+      console.error("Could not connect the weather MCP server", err);
+    }
   }
 
   @callable()
   async connectSentry() {
-    return await this.addMcpServer("sentry", "https://mcp.sentry.dev/mcp");
+    return await this.addMcpServer("sentry", "https://mcp.sentry.dev/mcp", { id: "sentry" });
   }
 
   @callable()
   async disconnectSentry() {
-    return await this.disconnectMcpByName("sentry");
-  }
-
-  private async disconnectMcpByName(name: string) {
     const { servers } = this.getMcpServers();
-    for (const [id, s] of Object.entries(servers)) {
-      if (s.name === name) await this.removeMcpServer(id);
+    for (const [id, server] of Object.entries(servers)) {
+      if (server.name === "sentry") await this.removeMcpServer(id);
     }
   }
 
   async onChatMessage(_onFinish: unknown, options?: OnChatMessageOptions) {
     const tools = this.mcp.getAITools();
-    const validToolNames = new Set(Object.keys(tools));
+    const toolNames = new Set(Object.keys(tools));
     const ai = createWorkersAI({ binding: this.env.AI });
 
-    // Sanitize history before feeding it back to the model:
-    //   1. Drop tool parts whose tool name is no longer in the roster (e.g. an
-    //      MCP was disconnected). Otherwise Kimi replays the stale name.
-    //   2. Strip Kimi tool-call template tokens that previously leaked as text.
-    //      Without this the model sees its own past leak and repeats it.
-    const sanitized = this.messages
+    // Drop tool calls of MCP servers that are no longer connected, otherwise the model calls them again.
+    const messages = this.messages
       .map((m) => ({
         ...m,
-        parts: m.parts
-          .map((p) => {
-            if (p.type === "text" && typeof p.text === "string") {
-              const cleaned = stripKimiTemplate(p.text);
-              return cleaned ? { ...p, text: cleaned } : null;
-            }
-            if (isToolUIPart(p) && !validToolNames.has(getToolName(p))) {
-              return null;
-            }
-            return p;
-          })
-          .filter((p): p is NonNullable<typeof p> => p !== null),
+        parts: m.parts.filter((p) => !isToolUIPart(p) || toolNames.has(getToolName(p))),
       }))
       .filter((m) => m.parts.length > 0);
 
     const result = streamText({
-      model: ai("@cf/moonshotai/kimi-k2.6", {
-        sessionAffinity: this.sessionAffinity,
-      }),
+      model: ai(MODEL, { sessionAffinity: this.sessionAffinity }),
       system: this.buildSystemPrompt(),
-      messages: await convertToModelMessages(sanitized),
+      messages: await convertToModelMessages(messages),
       tools,
       stopWhen: stepCountIs(5),
       abortSignal: options?.abortSignal,
     });
 
-    return result.toUIMessageStreamResponse();
+    return createUIMessageStreamResponse({ stream: result.toUIMessageStream() });
   }
 
   private buildSystemPrompt() {
-    const ready = Object.values(this.getMcpServers().servers).filter(
-      (s) => s.state === "ready",
+    const ready = new Set(
+      Object.values(this.getMcpServers().servers)
+        .filter((s) => s.state === "ready")
+        .map((s) => s.name),
     );
-    const githubReady = ready.some((s) => s.name === "github-inspector");
-    const sentryReady = ready.some((s) => s.name === "sentry");
-
-    const guidance: string[] = [];
-    if (githubReady) {
-      guidance.push(
-        "GitHub is connected: when the user gives a URL or owner/name, call getRepoInfo or getRecentPRs and cite the real numbers.",
-      );
-    }
-    if (sentryReady) {
-      guidance.push(
-        "Sentry is connected: use the available Sentry tools when the user asks about issues, projects, or traces.",
-      );
-    }
-
-    if (guidance.length === 0) {
-      return [
-        "You are a helpful assistant. No external tools are connected right now.",
-        "Answer from your own knowledge. If the question requires live data,",
-        "tell the user which tool (GitHub or Sentry) they need to connect.",
-        "Never fabricate tool calls or emit tool-call template syntax in your replies.",
-      ].join(" ");
-    }
 
     return [
-      "You are a helpful agent.",
-      ...guidance,
-      "Only call tools that are listed in your current tool roster — never invent tool names.",
-      "If you don't know, say so. Keep answers tight.",
-    ].join(" ");
+      "You are a friendly weather assistant.",
+      ready.has("weather")
+        ? "Use getWeather for the current weather and getForecast for the next days. Give the tools only the city name. Use only the values that the tools return, do not add other weather details."
+        : "The weather tools are not connected right now. Tell the user that you cannot get live weather data.",
+      ready.has("sentry")
+        ? "Sentry is connected: use the Sentry tools when the user asks about issues, projects or traces."
+        : "",
+      "Only call tools from your tool list. If you do not know something, say so. Keep answers short.",
+    ]
+      .filter(Boolean)
+      .join(" ");
   }
 }
 
-export const ChatAgent = Sentry.instrumentDurableObjectWithSentry(
-  (env: Env) => ({
-    dsn: "https://0299849066e3bcf4626b214897b6c17f@o447951.ingest.us.sentry.io/4510555608449024",
-    tracesSampleRate: 1.0,
-    enableRpcTracePropagation: true,
-    dataCollection: {},
-  }),
-  ChatAgentBase,
-);
-
-export default Sentry.withSentry(
-  (env: Env) => ({
-    dsn: "https://0299849066e3bcf4626b214897b6c17f@o447951.ingest.us.sentry.io/4510555608449024",
-    tracesSampleRate: 1.0,
-    enableRpcTracePropagation: true,
-    dataCollection: {},
-  }),
-  {
-    async fetch(req: Request, env: Env): Promise<Response> {
-      return (
-        (await routeAgentRequest(req, env, { cors: true })) ??
-        new Response("Not found", { status: 404 })
-      );
-    },
-  } satisfies ExportedHandler<Env>,
-);
+export default {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+    const { pathname } = new URL(request.url);
+    if (pathname === "/mcp") return mcpHandler(request, env, ctx);
+    // The browser SDK reads its DSN from here, so one SENTRY_DSN variable turns on Sentry for both sides.
+    if (pathname === "/config.json") return Response.json({ sentryDsn: env.SENTRY_DSN || null });
+    return (await routeAgentRequest(request, env)) ?? new Response("Not found", { status: 404 });
+  },
+} satisfies ExportedHandler<Env>;
