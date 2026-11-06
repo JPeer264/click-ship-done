@@ -1,6 +1,6 @@
 import { AIChatAgent, type OnChatMessageOptions } from "@cloudflare/ai-chat";
 import { callable, routeAgentRequest, type Connection, type ConnectionContext } from "agents";
-import { createWorkersAI } from "workers-ai-provider";
+import { createAI } from "agents/models/ai-sdk";
 import {
   convertToModelMessages,
   createUIMessageStreamResponse,
@@ -68,7 +68,7 @@ export class ChatAgent extends AIChatAgent<Env> {
   async onChatMessage(_onFinish: unknown, options?: OnChatMessageOptions) {
     const tools = this.mcp.getAITools();
     const toolNames = new Set(Object.keys(tools));
-    const ai = createWorkersAI({ binding: this.env.AI });
+    const ai = createAI({ binding: this.env.AI });
 
     // Drop tool calls of MCP servers that are no longer connected, otherwise the model calls them again.
     const messages = this.messages
