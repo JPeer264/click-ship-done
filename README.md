@@ -6,11 +6,11 @@ A chat agent that answers questions about the weather. It gets live data from a 
 
 [![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/JPeer264/click-ship-done)
 
-The button copies this repository to your GitHub account, creates the Durable Object and the Workers AI binding, and runs `vite build && wrangler deploy`. You do not need an API key: the model `@cf/zai-org/glm-4.7-flash` runs on the Workers AI free plan.
+The button copies this repository to your GitHub account, creates the Durable Object and the Workers AI binding, and runs `vite build && wrangler deploy`. You do not need an API key: the model `@cf/moonshotai/kimi-k2.6` runs on the Workers AI free plan.
 
 ## Sentry (optional)
 
-Set `SENTRY_DSN` to the DSN of your Sentry project, in the deploy form or later in the dashboard (**Settings** > **Variables and Secrets**). One value turns on Sentry for the Worker and for the browser. Without it, the app runs without Sentry.
+After the deploy, add the DSN of your Sentry project as the secret `SENTRY_DSN`: in the dashboard (**Settings** > **Variables and Secrets** > **Add**, type **Secret**), or with `npx wrangler secret put SENTRY_DSN`. A secret stays when the Worker deploys again. One value turns on Sentry for the Worker and for the browser. Without it, the app runs without Sentry.
 
 ## Local development
 

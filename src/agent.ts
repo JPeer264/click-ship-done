@@ -12,7 +12,7 @@ import {
 import { mcpHandler } from "./mcp";
 
 // Free on the Workers AI free plan, and it can call tools.
-const MODEL = "@cf/zai-org/glm-4.7-flash";
+const MODEL = "@cf/moonshotai/kimi-k2.6";
 
 export class ChatAgent extends AIChatAgent<Env> {
   maxPersistedMessages = 50;

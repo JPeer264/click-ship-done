@@ -35,12 +35,5 @@
     "typescript": "^7.0.2",
     "vite": "^8.3.5",
     "wrangler": "^4.158.0"
-  },
-  "cloudflare": {
-    "bindings": {
-      "SENTRY_DSN": {
-        "description": "Optional. The DSN of your [Sentry](https://sentry.io) project, to see the errors and traces of the agent. Leave it empty to run without Sentry."
-      }
-    }
   }
 }

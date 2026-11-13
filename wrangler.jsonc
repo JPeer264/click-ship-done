@@ -5,9 +5,6 @@
   "compatibility_date": "2026-04-01",
   // global_fetch_strictly_public: the agent connects to the MCP server of this same Worker over its public URL.
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
-  "vars": {
-    "SENTRY_DSN": ""
-  },
   "ai": { "binding": "AI", "remote": true },
   "assets": {
     "directory": "./dist/client",
