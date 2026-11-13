@@ -10,7 +10,7 @@ The button copies this repository to your GitHub account, creates the Durable Ob
 
 ## Sentry (optional)
 
-After the deploy, add the DSN of your Sentry project as the secret `SENTRY_DSN`: in the dashboard (**Settings** > **Variables and Secrets** > **Add**, type **Secret**), or with `npx wrangler secret put SENTRY_DSN`. A secret stays when the Worker deploys again. One value turns on Sentry for the Worker and for the browser. Without it, the app runs without Sentry.
+The deploy form has the field `SENTRY_DSN` with the value `off`. To turn on Sentry, replace `off` with the DSN of your Sentry project. To do this later, change `SENTRY_DSN` in the `wrangler.jsonc` of your copy of the repository and push. One value turns on Sentry for the Worker and for the browser. With `off`, the app runs without Sentry.
 
 ## Local development
 

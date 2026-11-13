@@ -6,8 +6,8 @@ declare global {
     AI: Ai;
     ASSETS: Fetcher;
     ChatAgent: DurableObjectNamespace<ChatAgent>;
-    /** DSN of the Sentry project, set as a secret of the Worker. Without it, Sentry is off. */
-    SENTRY_DSN?: string;
+    /** DSN of the Sentry project, or "off" to run without Sentry. */
+    SENTRY_DSN: string;
   }
 }
 

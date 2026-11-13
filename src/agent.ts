@@ -10,6 +10,7 @@ import {
   streamText,
 } from "ai";
 import { mcpHandler } from "./mcp";
+import { sentryDsn } from "./sentry-dsn";
 
 // Free on the Workers AI free plan, and it can call tools.
 const MODEL = "@cf/moonshotai/kimi-k2.6";
@@ -117,7 +118,7 @@ export default {
     const { pathname } = new URL(request.url);
     if (pathname === "/mcp") return mcpHandler(request, env, ctx);
     // The browser SDK reads its DSN from here, so one SENTRY_DSN variable turns on Sentry for both sides.
-    if (pathname === "/config.json") return Response.json({ sentryDsn: env.SENTRY_DSN || null });
+    if (pathname === "/config.json") return Response.json({ sentryDsn: sentryDsn(env) ?? null });
     return (await routeAgentRequest(request, env)) ?? new Response("Not found", { status: 404 });
   },
 } satisfies ExportedHandler<Env>;
