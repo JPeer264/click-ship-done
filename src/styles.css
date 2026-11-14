@@ -96,13 +96,18 @@ header {
 }
 
 /* Connection Pills */
+/* A pill is a span or a button. The fixed height and the inherited font give both the same size. */
 .pill {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 8px 14px;
+  box-sizing: border-box;
+  height: 36px;
+  padding: 0 14px;
+  font: inherit;
   font-size: 13px;
   font-weight: 500;
+  line-height: 1;
   border: 1px solid var(--border);
   border-radius: 100px;
   background: transparent;
